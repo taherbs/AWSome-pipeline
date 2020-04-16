@@ -70,41 +70,43 @@ class PipelineStack(core.Stack):
             run_order=1
         )
 
-        staging_action_ecs = codepipeline_actions.CodeDeployEcsDeployAction(
-            action_name="StagingEcs",
-            run_order=2,
-            deployment_group=deploy_group_stg,
-            app_spec_template_input=staging_output,
-            task_definition_template_input=staging_output
-        )
-
-        manual_approval_action = codepipeline_actions.ManualApprovalAction(
-            action_name="Approve"
-        )
-
-        production_action_infra = codepipeline_actions.CodeBuildAction(
-            action_name="ProductionInfra",
-            project=cdk_project,
-            input=source_output,
-            outputs=[production_output],
-            environment_variables={
-                "ENV": {"value": "prd"}
-            },
-            run_order=1
-        )
-
-        production_action_ecs = codepipeline_actions.CodeDeployEcsDeployAction(
-            action_name="ProductionEcs",
-            run_order=2,
-            deployment_group=deploy_group_stg,
-            app_spec_template_input=production_output,
-            task_definition_template_input=production_output
-        )
+        # staging_action_ecs = codepipeline_actions.CodeDeployEcsDeployAction(
+        #     action_name="StagingEcs",
+        #     run_order=2,
+        #     deployment_group=deploy_group_stg,
+        #     app_spec_template_input=staging_output,
+        #     task_definition_template_input=staging_output,
+        #     task_definition_template_file="cazzo"
+        # )
+        #
+        # manual_approval_action = codepipeline_actions.ManualApprovalAction(
+        #     action_name="Approve"
+        # )
+        #
+        # production_action_infra = codepipeline_actions.CodeBuildAction(
+        #     action_name="ProductionInfra",
+        #     project=cdk_project,
+        #     input=source_output,
+        #     outputs=[production_output],
+        #     environment_variables={
+        #         "ENV": {"value": "prd"}
+        #     },
+        #     run_order=1
+        # )
+        #
+        # production_action_ecs = codepipeline_actions.CodeDeployEcsDeployAction(
+        #     action_name="ProductionEcs",
+        #     run_order=2,
+        #     deployment_group=deploy_group_stg,
+        #     app_spec_template_input=production_output,
+        #     task_definition_template_input=production_output
+        # )
 
         key = kms.Key(self, "key")
         bucket = s3.Bucket(self, "bucket_artifacts", encryption_key=key)
         pipeline = codepipeline.Pipeline(self, "Pipeline", artifact_bucket=bucket)
         pipeline.add_stage(stage_name="Source", actions=[source_action])
-        pipeline.add_stage(stage_name="Staging", actions=[staging_action_infra, staging_action_ecs])
-        pipeline.add_stage(stage_name="Approval", actions=[manual_approval_action])
-        pipeline.add_stage(stage_name="Production", actions=[production_action_infra, production_action_ecs])
+        pipeline.add_stage(stage_name="Staging", actions=[staging_action_infra])
+        # pipeline.add_stage(stage_name="Staging", actions=[staging_action_infra, staging_action_ecs])
+        # pipeline.add_stage(stage_name="Approval", actions=[manual_approval_action])
+        # pipeline.add_stage(stage_name="Production", actions=[production_action_infra, production_action_ecs])

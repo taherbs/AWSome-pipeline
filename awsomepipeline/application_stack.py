@@ -2,9 +2,9 @@ from aws_cdk import (
     core,
     aws_ecs as ecs,
     aws_ecs_patterns as ecs_patterns,
-    aws_ecr_assets as ecr_assets,
-    aws_codedeploy as codedeploy
+    aws_ecr_assets as ecr_assets
 )
+
 
 class WebAppStack(core.Stack):
 
@@ -12,26 +12,15 @@ class WebAppStack(core.Stack):
                  env_level="prd", **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        self.web_asset = ecr_assets.DockerImageAsset(self, 'web_asset', directory="docker", file="web/Dockerfile")
-        self.app_asset = ecr_assets.DockerImageAsset(self, 'app_asset', directory="docker", file="app/Dockerfile")
+        web_asset = ecr_assets.DockerImageAsset(self, 'web_asset', directory="docker", file="web/Dockerfile")
+        app_asset = ecr_assets.DockerImageAsset(self, 'app_asset', directory="docker", file="app/Dockerfile")
 
         cluster = ecs.Cluster(self, "Cluster", vpc=vpc)
-
-        alb_options = ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
-            image=ecs.ContainerImage.from_ecr_repository(
-                self.web_asset.repository,
-                self.web_asset.image_uri[-64:]
-            ),
-            environment={
-                "ENV": env_level,
-            }
-        )
 
         service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self, "fargate",
             cluster=cluster,
             desired_count=1,
-            task_image_options=alb_options,
             public_load_balancer=True,
             listener_port=80
         )
@@ -48,18 +37,6 @@ class WebAppStack(core.Stack):
         service.target_group.enable_cookie_stickiness(core.Duration.hours(1))
 
         service.target_group.set_attribute("deregistration_delay.timeout_seconds","10")
-
-        service.task_definition.add_container(
-            "app",
-            image=ecs.ContainerImage.from_ecr_repository(
-                self.app_asset.repository,
-                self.app_asset.image_uri[-64:]
-            ),
-            logging=ecs.LogDriver.aws_logs(stream_prefix="fargate"),
-            environment={
-                "ENV": env_level,
-            }
-        )
 
         scalable_target = service.service.auto_scale_task_count(max_capacity=20)
 
