@@ -13,8 +13,16 @@ phases:
   build:
     commands:
       - 'cdk deploy "*" --context stack=$ENV --require-approval never'
+  post_build:
+    commands:
+      - 'printf {"ImageURI":"image_URI"} > imageDetail.json'
+      - 'printf [{"name":"hello-world","imageUri":"%s"}] $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json'
+artifacts:
+  files:
+    - imageDetail.json
+    - imagedefinitions.json
 cache:
   paths:
-  - '/~/.docker-cache/**/*'
+  - '~/.docker-cache/**/*'
   - '~/.cache/**/*'
   - '~/.npm/**/*'

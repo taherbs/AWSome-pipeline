@@ -14,7 +14,7 @@ app = core.App()
 
 context = app.node.try_get_context("stack")
 
-stack_vpc = VpcStack(app,"awsome-vpc", env=env)
+stack_vpc = VpcStack(app,"awsome-vpc", from_vpc_name="VPC-RD", env=env)
 
 if context == "prd":
     WebAppStack(app, "awsome-prd", vpc=stack_vpc.vpc, env=env)
@@ -25,7 +25,7 @@ elif context == "pipeline":
         app,
         "AWSome-pipeline",
         git_token_key="my_secret_token",
-        github_branch="master",
+        github_branch="codedeploy",
         github_owner="enricopesce",
         github_repo="AWSome-pipeline",
         env=env

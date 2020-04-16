@@ -5,14 +5,24 @@ from aws_cdk import (
     aws_kms as kms,
     aws_s3 as s3,
     aws_iam as iam,
+    aws_codedeploy as codedeploy,
     core
 )
 
 class PipelineStack(core.Stack):
 
     def __init__(self, scope: core.Construct, id: str, *, git_token_key="", github_owner="",
-                 github_repo="", github_branch="", **kwargs) -> None:
+                 github_repo="", github_branch="", alb="", **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
+
+        deploy_app_stg = codedeploy.EcsApplication(self, id="stg")
+
+        deploy_group_stg = codedeploy.EcsDeploymentGroup.from_ecs_deployment_group_attributes(
+            self,
+            id="ciao",
+            application=deploy_app_stg,
+            deployment_group_name="banana"
+        )
 
         role = iam.Role(
             self,
@@ -49,34 +59,52 @@ class PipelineStack(core.Stack):
             output=source_output
         )
 
-        staging_action = codepipeline_actions.CodeBuildAction(
-            action_name="Deliver",
+        staging_action_infra = codepipeline_actions.CodeBuildAction(
+            action_name="StagingInfra",
             project=cdk_project,
             input=source_output,
             outputs=[staging_output],
             environment_variables={
                 "ENV": {"value": "stg"}
-            }
+            },
+            run_order=1
+        )
+
+        staging_action_ecs = codepipeline_actions.CodeDeployEcsDeployAction(
+            action_name="StagingEcs",
+            run_order=2,
+            deployment_group=deploy_group_stg,
+            app_spec_template_input=staging_output,
+            task_definition_template_input=staging_output
         )
 
         manual_approval_action = codepipeline_actions.ManualApprovalAction(
             action_name="Approve"
         )
 
-        production_action = codepipeline_actions.CodeBuildAction(
-            action_name="Deliver",
+        production_action_infra = codepipeline_actions.CodeBuildAction(
+            action_name="ProductionInfra",
             project=cdk_project,
             input=source_output,
             outputs=[production_output],
             environment_variables={
                 "ENV": {"value": "prd"}
-            }
+            },
+            run_order=1
+        )
+
+        production_action_ecs = codepipeline_actions.CodeDeployEcsDeployAction(
+            action_name="ProductionEcs",
+            run_order=2,
+            deployment_group=deploy_group_stg,
+            app_spec_template_input=production_output,
+            task_definition_template_input=production_output
         )
 
         key = kms.Key(self, "key")
         bucket = s3.Bucket(self, "bucket_artifacts", encryption_key=key)
         pipeline = codepipeline.Pipeline(self, "Pipeline", artifact_bucket=bucket)
         pipeline.add_stage(stage_name="Source", actions=[source_action])
-        pipeline.add_stage(stage_name="Staging", actions=[staging_action])
+        pipeline.add_stage(stage_name="Staging", actions=[staging_action_infra, staging_action_ecs])
         pipeline.add_stage(stage_name="Approval", actions=[manual_approval_action])
-        pipeline.add_stage(stage_name="Production", actions=[production_action])
+        pipeline.add_stage(stage_name="Production", actions=[production_action_infra, production_action_ecs])
